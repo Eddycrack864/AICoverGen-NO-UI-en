@@ -222,10 +222,12 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
         # if youtube url
         if urlparse(song_input).scheme == 'https':
             input_type = 'yt'
-            song_id = get_hash(song_input)
-            orig_song_path = yt_download(song_input)
-            if orig_song_path is None:
-                error_msg = 'Download failed or invalid URL.'
+            song_input = download_path
+            if os.path.exists(song_input):
+                song_id = get_hash(song_input)
+            else:
+                error_msg = f'{song_input} does not exist.'
+                song_id = None
                 raise_exception(error_msg, is_webui)
 
 
