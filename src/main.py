@@ -28,24 +28,6 @@ rvc_models_dir = os.path.join(BASE_DIR, 'rvc_models')
 output_dir = os.path.join(BASE_DIR, 'song_output')
 
 
-def yt_download(url):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': 'ytdl/%(title)s.%(ext)s',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'wav',
-            'preferredquality': '192',
-        }],
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(url, download=True)
-        download_path = ydl.prepare_filename(info_dict).rsplit('.', 1)[0] + '.wav'
-        sample_rate, audio_data = read(file_path)
-        audio_array = np.asarray(audio_data, dtype=np.int16)
-
-        return download_path
 
 
 
@@ -205,6 +187,24 @@ def combine_audio(audio_paths, output_path, main_gain, backup_gain, inst_gain, o
     main_vocal_audio.overlay(backup_vocal_audio).overlay(instrumental_audio).export(output_path, format=output_format)
 
 
+def yt_download(url):
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': 'ytdl/%(title)s.%(ext)s',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'wav',
+            'preferredquality': '192',
+        }],
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info_dict = ydl.extract_info(url, download=True)
+        download_path = ydl.prepare_filename(info_dict).rsplit('.', 1)[0] + '.wav'
+
+    return download_path  # Ensure download_path is returned
+
+
 def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
                         is_webui=0, main_gain=0, backup_gain=0, inst_gain=0, index_rate=0.5, filter_radius=3,
                         rms_mix_rate=0.25, f0_method='rmvpe', crepe_hop_length=128, protect=0.33, pitch_change_all=0,
@@ -222,15 +222,8 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
         # if youtube url
         if urlparse(song_input).scheme == 'https':
             input_type = 'yt'
-            song_input = download_path
-            if os.path.exists(song_input):
-                song_id = get_hash(song_input)
-            else:
-                error_msg = f'{song_input} does not exist.'
-                song_id = None
-                raise_exception(error_msg, is_webui)
-
-
+            song_input = yt_download(song_input)  # Correctly assign download path to song_input
+            song_id = get_hash(song_input)
         # local audio file
         else:
             input_type = 'local'
@@ -247,7 +240,6 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
         if not os.path.exists(song_dir):
             os.makedirs(song_dir)
             orig_song_path, vocals_path, instrumentals_path, main_vocals_path, backup_vocals_path, main_vocals_dereverb_path = preprocess_song(song_input, mdx_model_params, song_id, is_webui, input_type, progress)
-
         else:
             vocals_path, main_vocals_path = None, None
             paths = get_audio_paths(song_dir)
@@ -266,18 +258,17 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
             display_progress('[~] Converting voice using RVC...', 0.5, is_webui, progress)
             voice_change(voice_model, main_vocals_dereverb_path, ai_vocals_path, pitch_change, f0_method, index_rate, filter_radius, rms_mix_rate, protect, crepe_hop_length, is_webui)
 
-        
         if pitch_change_all != 0:
             display_progress('[~] Applying overall pitch change', 0.85, is_webui, progress)
             instrumentals_path = pitch_shift(instrumentals_path, pitch_change_all)
             backup_vocals_path = pitch_shift(backup_vocals_path, pitch_change_all)
 
         display_progress('[~] Combining AI Vocals and Instrumentals...', 0.9, is_webui, progress)
-        combine_audio([ai_vocals_mixed_path, backup_vocals_path, instrumentals_path], ai_cover_path, main_gain, backup_gain, inst_gain, output_format)
+        combine_audio([ai_vocals_path, backup_vocals_path, instrumentals_path], ai_cover_path, main_gain, backup_gain, inst_gain, output_format)
 
         if not keep_files:
             display_progress('[~] Removing intermediate audio files...', 0.95, is_webui, progress)
-            intermediate_files = [vocals_path, main_vocals_path, ai_vocals_mixed_path]
+            intermediate_files = [vocals_path, main_vocals_path, ai_vocals_path]
             if pitch_change_all != 0:
                 intermediate_files += [instrumentals_path, backup_vocals_path]
             for file in intermediate_files:
@@ -291,7 +282,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate a AI cover song in the song_output/id directory.', add_help=True)
+    parser = argparse.ArgumentParser(description='Generate an AI cover song in the song_output/id directory.', add_help=True)
     parser.add_argument('-i', '--song-input', type=str, required=True, help='Link to a YouTube video or the filepath to a local mp3/wav file to create an AI cover of')
     parser.add_argument('-dir', '--rvc-dirname', type=str, required=True, help='Name of the folder in the rvc_models directory containing the RVC model file and optional index file to use')
     parser.add_argument('-p', '--pitch-change', type=int, required=True, help='Change the pitch of AI Vocals only. Generally, use 1 for male to female and -1 for vice-versa. (Octaves)')
@@ -305,28 +296,20 @@ if __name__ == '__main__':
     parser.add_argument('-mv', '--main-vol', type=int, default=0, help='Volume change for AI main vocals in decibels. Use -3 to decrease by 3 decibels and 3 to increase by 3 decibels')
     parser.add_argument('-bv', '--backup-vol', type=int, default=0, help='Volume change for backup vocals in decibels')
     parser.add_argument('-iv', '--inst-vol', type=int, default=0, help='Volume change for instrumentals in decibels')
-    parser.add_argument('-pall', '--pitch-change-all', type=int, default=0, help='Change the pitch/key of vocals and instrumentals. Changing this slightly reduces sound quality')
-    parser.add_argument('-rsize', '--reverb-size', type=float, default=0.15, help='Reverb room size between 0 and 1')
-    parser.add_argument('-rwet', '--reverb-wetness', type=float, default=0.2, help='Reverb wet level between 0 and 1')
-    parser.add_argument('-rdry', '--reverb-dryness', type=float, default=0.8, help='Reverb dry level between 0 and 1')
-    parser.add_argument('-rdamp', '--reverb-damping', type=float, default=0.7, help='Reverb damping between 0 and 1')
-    parser.add_argument('-oformat', '--output-format', type=str, default='mp3', help='Output format of audio file. mp3 for smaller file size, wav for best quality')
+    parser.add_argument('-pall', '--pitch-change-all', type=int, default=0, help='Change the pitch/key of vocals and instrumentals. Changing this slightly reduces sound quality. Generally, use 1 for male to female and -1 for vice-versa. (Octaves)')
+    parser.add_argument('-rs', '--reverb-size', type=float, default=0.15, help='A decimal number e.g. 0.15. Size of reverb room applied to backup vocals. If set to 0, disable reverb.')
+    parser.add_argument('-rw', '--reverb-wet', type=float, default=0.2, help='A decimal number e.g. 0.2. How loud reverb is (relative to dry mix) applied to backup vocals')
+    parser.add_argument('-rd', '--reverb-dry', type=float, default=0.8, help='A decimal number e.g. 0.8. How loud the backup vocals are (relative to the original vocals)')
+    parser.add_argument('-rdm', '--reverb-damp', type=float, default=0.7, help='A decimal number e.g. 0.7. High frequencies damping in the reverb applied to backup vocals')
+    parser.add_argument('-f', '--output-format', type=str, default='mp3', help='Either mp3 or wav')
+    parser.add_argument('-wv2', '--is-webui', action=argparse.BooleanOptionalAction, help='Specify if running in the gradio web UI')
+
     args = parser.parse_args()
 
-    rvc_dirname = args.rvc_dirname
-    if not os.path.exists(os.path.join(rvc_models_dir, rvc_dirname)):
-        raise Exception(f'The folder {os.path.join(rvc_models_dir, rvc_dirname)} does not exist.')
-
-    cover_path = song_cover_pipeline(args.song_input, rvc_dirname, args.pitch_change, args.keep_files,
-                                     main_gain=args.main_vol, backup_gain=args.backup_vol, inst_gain=args.inst_vol,
-                                     index_rate=args.index_rate, filter_radius=args.filter_radius,
-                                     rms_mix_rate=args.rms_mix_rate, f0_method=args.pitch_detection_algo,
-                                     crepe_hop_length=args.crepe_hop_length, protect=args.protect,
-                                     pitch_change_all=args.pitch_change_all,
-                                     reverb_rm_size=args.reverb_size, reverb_wet=args.reverb_wetness,
-                                     reverb_dry=args.reverb_dryness, reverb_damping=args.reverb_damping,
-                                     output_format=args.output_format)
-    print(f'[+] Cover generated at {cover_path}')
+    main = song_cover_pipeline(args.song_input, args.rvc_dirname, args.pitch_change, args.keep_files,
+                               is_webui=args.is_webui, main_gain=args.main_vol, backup_gain=args.backup_vol, inst_gain=args.inst_vol, index_rate=args.index_rate, filter_radius=args.filter_radius,
+                               rms_mix_rate=args.rms_mix_rate, f0_method=args.pitch_detection_algo, crepe_hop_length=args.crepe_hop_length, protect=args.protect, pitch_change_all=args.pitch_change_all,
+                               reverb_rm_size=args.reverb_size, reverb_wet=args.reverb_wet, reverb_dry=args.reverb_dry, reverb_damping=args.reverb_damp, output_format=args.output_format)
 
 
 print(f"showing {cover_path}")
