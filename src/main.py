@@ -28,80 +28,25 @@ rvc_models_dir = os.path.join(BASE_DIR, 'rvc_models')
 output_dir = os.path.join(BASE_DIR, 'song_output')
 
 
-
-def get_media_id(url, ignore_playlist=True):
-    """
-    Extract media ID from URLs of various platforms like YouTube, Spotify, SoundCloud, and Pornhub.
-    
-    Examples:
-    YouTube:
-        - http://youtu.be/SA2iWivDJiE
-        - http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
-    Spotify:
-        - https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6
-    SoundCloud:
-        - https://soundcloud.com/forss/flickermood
-    Pornhub:
-        - https://www.pornhub.com/view_video.php?viewkey=ph5c5b45c003141
-    """
-    query = urlparse(url)
-    
-    # YouTube
-    if query.hostname in {'youtu.be', 'www.youtube.com', 'youtube.com', 'music.youtube.com'}:
-        if query.hostname == 'youtu.be':
-            if query.path[1:] == 'watch':
-                return query.query[2:]
-            return query.path[1:]
-
-        if not ignore_playlist and 'list' in parse_qs(query.query):
-            return parse_qs(query.query)['list'][0]
-        if query.path == '/watch':
-            return parse_qs(query.query)['v'][0]
-        if query.path[:7] == '/watch/':
-            return query.path.split('/')[1]
-        if query.path[:7] == '/embed/':
-            return query.path.split('/')[2]
-        if query.path[:3] == '/v/':
-            return query.path.split('/')[2]
-
-    # Spotify
-    if query.hostname in {'open.spotify.com', 'play.spotify.com'}:
-        return query.path.split('/')[-1]
-
-    # SoundCloud
-    if query.hostname in {'soundcloud.com', 'www.soundcloud.com'}:
-        return query.path
-
-    # Pornhub
-    if query.hostname in {'www.pornhub.com', 'pornhub.com'}:
-        return parse_qs(query.query).get('viewkey', [None])[0]
-
-    # returns None for unsupported or invalid URL
-    return None
-
-
-#def yt_download(link):
-def yt_download(link):
+def yt_download(url):
     ydl_opts = {
-        'format': 'bestaudio',
-        'outtmpl': '%(title)s.%(ext)s',  # Updated to specify both title and extension
-        'nocheckcertificate': True,
-        'ignoreerrors': True,
-        'no_warnings': True,
-        'extractaudio': True,
-        'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3'}],
+        'format': 'bestaudio/best',
+        'outtmpl': 'ytdl/%(title)s.%(ext)s',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'wav',
+            'preferredquality': '192',
+        }],
     }
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        result = ydl.extract_info(link, download=True)
-        
-        # Check if result is None
-        if result is None:
-            return None
-        
-        download_path = ydl.prepare_filename(result)
-        download_path = os.path.splitext(download_path)[0] + '.mp3'  # Ensure extension is .mp3
-        
-    return download_path
+        info_dict = ydl.extract_info(url, download=True)
+        download_path = ydl.prepare_filename(info_dict).rsplit('.', 1)[0] + '.wav'
+        sample_rate, audio_data = read(file_path)
+        audio_array = np.asarray(audio_data, dtype=np.int16)
+
+        return download_path
+
 
 
 
@@ -278,7 +223,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
         if urlparse(song_input).scheme == 'https':
             input_type = 'yt'
             song_id = get_hash(song_input)
-            orig_song_path = get_media_id(song_input)
+            orig_song_path = yt_download(song_input)
             if orig_song_path is None:
                 error_msg = 'Download failed or invalid URL.'
                 raise_exception(error_msg, is_webui)
