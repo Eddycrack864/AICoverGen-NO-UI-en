@@ -353,3 +353,9 @@ if __name__ == '__main__':
                                      reverb_dry=args.reverb_dryness, reverb_damping=args.reverb_damping,
                                      output_format=args.output_format)
     print(f'[+] Cover generated at {cover_path}')
+
+
+print(f"showing {cover_path}")
+
+AudioSegment.from_file(cover_path)
+
