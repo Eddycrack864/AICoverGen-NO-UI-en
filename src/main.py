@@ -187,22 +187,23 @@ def combine_audio(audio_paths, output_path, main_gain, backup_gain, inst_gain, o
     main_vocal_audio.overlay(backup_vocal_audio).overlay(instrumental_audio).export(output_path, format=output_format)
 
 
+
+
 def yt_download(url):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': 'ytdl/%(title)s.%(ext)s',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'wav',
-            'preferredquality': '192',
-        }],
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(url, download=True)
-        download_path = ydl.prepare_filename(info_dict).rsplit('.', 1)[0] + '.wav'
-
-    return download_path  # Ensure download_path is returned
+    if url.startswith("http"):  # Check if the input is a URL
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': 'ytdl/%(title)s.%(ext)s',
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info_dict = ydl.extract_info(url, download=True)
+            return os.path.join('ytdl', f"{info_dict['title']}.{info_dict['ext']}")
+    else:
+        # Check if the file exists in the local path
+        if os.path.isfile(url):
+            return url
+        else:
+            raise FileNotFoundError(f"Local file not found: {url}")
 
 
 def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
