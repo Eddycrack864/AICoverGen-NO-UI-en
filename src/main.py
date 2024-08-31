@@ -31,9 +31,10 @@ output_dir = os.path.join(BASE_DIR, 'song_output')
 
 
 def yt_download(link):
+def yt_download(link):
     ydl_opts = {
         'format': 'bestaudio',
-        'outtmpl': '%(title)s',
+        'outtmpl': '%(title)s.%(ext)s',  # Updated to specify both title and extension
         'nocheckcertificate': True,
         'ignoreerrors': True,
         'no_warnings': True,
@@ -42,9 +43,16 @@ def yt_download(link):
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         result = ydl.extract_info(link, download=True)
-        download_path = ydl.prepare_filename(result, outtmpl='%(title)s.mp3')
-
+        
+        # Check if result is None
+        if result is None:
+            return None
+        
+        download_path = ydl.prepare_filename(result)
+        download_path = os.path.splitext(download_path)[0] + '.mp3'  # Ensure extension is .mp3
+        
     return download_path
+
 
 
 def raise_exception(error_msg, is_webui):
@@ -219,10 +227,12 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
         # if youtube url
         if urlparse(song_input).scheme == 'https':
             input_type = 'yt'
-            song_id = yt_download(song_input)
-            if song_id is None:
-                error_msg = 'Invalid url.'
+            song_id = get_hash(song_input)
+            orig_song_path = yt_download(song_input)
+            if orig_song_path is None:
+                error_msg = 'Download failed or invalid URL.'
                 raise_exception(error_msg, is_webui)
+
 
         # local audio file
         else:
