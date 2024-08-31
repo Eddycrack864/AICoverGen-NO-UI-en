@@ -28,36 +28,6 @@ rvc_models_dir = os.path.join(BASE_DIR, 'rvc_models')
 output_dir = os.path.join(BASE_DIR, 'song_output')
 
 
-def get_youtube_video_id(url, ignore_playlist=True):
-    """
-    Examples:
-    http://youtu.be/SA2iWivDJiE
-    http://www.youtube.com/watch?v=_oPAwA_Udwc&feature=feedu
-    http://www.youtube.com/embed/SA2iWivDJiE
-    http://www.youtube.com/v/SA2iWivDJiE?version=3&amp;hl=en_US
-    """
-    query = urlparse(url)
-    if query.hostname == 'youtu.be':
-        if query.path[1:] == 'watch':
-            return query.query[2:]
-        return query.path[1:]
-
-    if query.hostname in {'www.youtube.com', 'youtube.com', 'music.youtube.com'}:
-        if not ignore_playlist:
-            # use case: get playlist id not current video in playlist
-            with suppress(KeyError):
-                return parse_qs(query.query)['list'][0]
-        if query.path == '/watch':
-            return parse_qs(query.query)['v'][0]
-        if query.path[:7] == '/watch/':
-            return query.path.split('/')[1]
-        if query.path[:7] == '/embed/':
-            return query.path.split('/')[2]
-        if query.path[:3] == '/v/':
-            return query.path.split('/')[2]
-
-    # returns None for invalid YouTube url
-    return None
 
 
 def yt_download(link):
@@ -67,7 +37,6 @@ def yt_download(link):
         'nocheckcertificate': True,
         'ignoreerrors': True,
         'no_warnings': True,
-        'quiet': True,
         'extractaudio': True,
         'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3'}],
     }
@@ -250,9 +219,9 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
         # if youtube url
         if urlparse(song_input).scheme == 'https':
             input_type = 'yt'
-            song_id = get_youtube_video_id(song_input)
+            song_id = yt_download(song_input)
             if song_id is None:
-                error_msg = 'Invalid YouTube url.'
+                error_msg = 'Invalid url.'
                 raise_exception(error_msg, is_webui)
 
         # local audio file
@@ -290,9 +259,7 @@ def song_cover_pipeline(song_input, voice_model, pitch_change, keep_files,
             display_progress('[~] Converting voice using RVC...', 0.5, is_webui, progress)
             voice_change(voice_model, main_vocals_dereverb_path, ai_vocals_path, pitch_change, f0_method, index_rate, filter_radius, rms_mix_rate, protect, crepe_hop_length, is_webui)
 
-        display_progress('[~] Applying audio effects to Vocals...', 0.8, is_webui, progress)
-        ai_vocals_mixed_path = add_audio_effects(ai_vocals_path, reverb_rm_size, reverb_wet, reverb_dry, reverb_damping)
-
+        
         if pitch_change_all != 0:
             display_progress('[~] Applying overall pitch change', 0.85, is_webui, progress)
             instrumentals_path = pitch_shift(instrumentals_path, pitch_change_all)
