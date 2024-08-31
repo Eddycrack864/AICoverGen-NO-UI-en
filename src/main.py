@@ -313,7 +313,4 @@ if __name__ == '__main__':
                                reverb_rm_size=args.reverb_size, reverb_wet=args.reverb_wet, reverb_dry=args.reverb_dry, reverb_damping=args.reverb_damp, output_format=args.output_format)
 
 
-print(f"showing {ai_cover_path}")
-
-AudioSegment.from_file(ai_cover_path)
 
