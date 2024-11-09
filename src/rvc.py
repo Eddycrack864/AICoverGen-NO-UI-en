@@ -5,14 +5,14 @@ import torch
 from fairseq import checkpoint_utils
 from scipy.io import wavfile
 
-from infer_pack.models import (
+from src.infer_pack.models import (
     SynthesizerTrnMs256NSFsid,
     SynthesizerTrnMs256NSFsid_nono,
     SynthesizerTrnMs768NSFsid,
     SynthesizerTrnMs768NSFsid_nono,
 )
-from my_utils import load_audio
-from vc_infer_pipeline import VC
+from src.my_utils import load_audio
+from src.vc_infer_pipeline import VC
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
