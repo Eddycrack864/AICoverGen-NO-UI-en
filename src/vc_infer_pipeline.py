@@ -324,7 +324,7 @@ class VC(object):
                 from rmvpe import RMVPE
 
                 self.model_rmvpe = RMVPE(
-                    os.path.join(BASE_DIR, 'rvc_models', 'rmvpe.pt'), is_half=self.is_half, device=self.device
+                    os.path.join(BASE_DIR, 'voice_models', 'rmvpe.pt'), is_half=self.is_half, device=self.device
                 )
             f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
 
