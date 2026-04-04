@@ -12,7 +12,7 @@ from main import song_cover_pipeline
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 mdxnet_models_dir = os.path.join(BASE_DIR, 'mdxnet_models')
-rvc_models_dir = os.path.join(BASE_DIR, 'rvc_models')
+voice_models_dir = os.path.join(BASE_DIR, 'voice_models')
 output_dir = os.path.join(BASE_DIR, 'song_output')
 
 
@@ -23,7 +23,7 @@ def get_current_models(models_dir):
 
 
 def update_models_list():
-    models_l = get_current_models(rvc_models_dir)
+    models_l = get_current_models(voice_models_dir)
     return gr.Dropdown.update(choices=models_l)
 
 
@@ -71,7 +71,7 @@ def download_online_model(url, dir_name, progress=gr.Progress()):
     try:
         progress(0, desc=f'[~] Downloading voice model with name {dir_name}...')
         zip_name = url.split('/')[-1]
-        extraction_folder = os.path.join(rvc_models_dir, dir_name)
+        extraction_folder = os.path.join(voice_models_dir, dir_name)
         if os.path.exists(extraction_folder):
             raise gr.Error(f'Voice model directory {dir_name} already exists! Choose a different name for your voice model.')
 
@@ -90,7 +90,7 @@ def download_online_model(url, dir_name, progress=gr.Progress()):
 
 def upload_local_model(zip_path, dir_name, progress=gr.Progress()):
     try:
-        extraction_folder = os.path.join(rvc_models_dir, dir_name)
+        extraction_folder = os.path.join(voice_models_dir, dir_name)
         if os.path.exists(extraction_folder):
             raise gr.Error(f'Voice model directory {dir_name} already exists! Choose a different name for your voice model.')
 
@@ -162,8 +162,8 @@ if __name__ == '__main__':
     parser.add_argument('--listen-port', type=int, help='The listening port that the server will use.')
     args = parser.parse_args()
 
-    voice_models = get_current_models(rvc_models_dir)
-    with open(os.path.join(rvc_models_dir, 'public_models.json'), encoding='utf8') as infile:
+    voice_models = get_current_models(voice_models_dir)
+    with open(os.path.join(voice_models_dir, 'public_models.json'), encoding='utf8') as infile:
         public_models = json.load(infile)
 
     with gr.Blocks(title='AICoverGenWebUI') as app:
