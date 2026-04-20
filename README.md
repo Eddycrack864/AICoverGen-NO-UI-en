@@ -1,3 +1,5 @@
 # AICoverGen Dependencies English
 
-Collab Link: https://colab.research.google.com/drive/1u1brjK8IZt647UsbZuGYfW29oFM2I4tk#scrollTo=PNIn-NKDjYJ3
+This notebook is no longer functional; instead, use the refactored version to avoid being banned from Google Colab.
+
+Link: https://colab.research.google.com/drive/1aHFqgaDBKQXKN2cLvqpJh2uDuTAfKlp2?usp=sharing
